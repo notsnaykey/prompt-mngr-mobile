@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Manager for LLMs</title>
+    <!-- Quill.js for rich text editing -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+    <style>
+        /* Basic reset and dark mode styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            line-height: 1.4;
+            padding: 10px;
+        }
+        
+        /* Responsive container */
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            max-width: 100%;
+            margin: 0 auto;
+            gap: 10px;
+            height: auto;
+            min-height: calc(100vh - 20px);
+        }
+        
+        /* Mobile navigation bar */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #1a1a1a;
+            z-index: 1000;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+        }
+        .mobile-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mobile-title {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        
+        /* Panel visibility classes for mobile */
+        .panel-visible {
+            display: block;
+        }
+        .panel-hidden {
+            display: none;
+        }
+        
+        /* Mobile panel navigation */
+        .mobile-panel-nav {
+            display: none;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .mobile-panel-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .panel-btn {
+            flex: 1;
+            background-color: #333;
+            color: #e0e0e0;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .panel-btn.active {
+            background-color: #bb86fc;
+            color: #121212;
+        }
+        
+        /* Panel base styles */
+        .panel {
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 8px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            overflow-y: auto;
+        }
+        
+        /* Summary panel */
+        .summary-panel {
+            overflow-y: auto;
+        }
+        .summary-panel h2 {
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #444;
+        }
+        
+        /* Main content */
+        .main-content {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Subcategory container */
+        .subcategory-container {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            margin-top: 10px;
+        }
+        
+        /* Subcategory list */
+        .subcategory-list {
+            margin-bottom: 15px;
+        }
+        
+        /* Text boxes container */
+        .text-boxes-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Content area grid */
+        .content-area-grid {
+            display: flex;
+            flex-grow: 1;
+            flex-direction: column;
+        }
+        
+        /* Text boxes header */
+        .text-boxes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        /* Text boxes panel */
+        .text-boxes-panel {
+            background-color: #232323;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            min-height: 200px;
+        }
+        
+        /* Typography */
+        h1, h2, h3 {
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+        h1 {
+            font-size: 1.2em;
+        }
+        h2 {
+            font-size: 1.1em;
+        }
+        
+        /* Lists */
+        ul {
+            list-style: none;
+            margin-bottom: 8px;
+        }
+        li {
+            padding: 8px 0;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        li:hover {
+            color: #bb86fc;
+        }
+        .active {
+            color: #bb86fc;
+            font-weight: bold;
+        }
+        
+        /* Content placeholder */
+        .content-placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        /* Search styles */
+        #search-container {
+            margin-bottom: 15px;
+            background-color: #232323;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .search-box {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: #e0e0e0;
+            font-size: 1em;
+        }
+        .search-box button {
+            background-color: #bb86fc;
+            color: #121212;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            min-width: 80px;
+        }
+        .filter-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            flex-wrap: wrap;
+        }
+        .filter-options select {
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            font-size: 1em;
+            flex-grow: 1;
+            max-width: 100%;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #aaa;
+            font-style: italic;
+        }
+        .empty-state p {
+            margin-bottom: 15px;
+        }
+        
+        /* Search results */
+        .search-results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #232323;
+            border-radius: 8px;
+        }
+        .result-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .result-header {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #bb86fc;
+        }
+        
+        /* Content box styles */
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .add-btn {
+            background-color: #bb86fc;
+            color: #121212;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .text-box {
+            background-color: #2d2d2d;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+            width: 100%;
+        }
+        .text-box.completed {
+            opacity: 0.6;
+            background-color: #222;
+        }
+        .text-box.good {
+            background-color: rgba(0, 128, 0, 0.15);
+            border-left-color: #4caf50;
+        }
+        .text-box-controls {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+        .delete-btn {
+            background-color: #cf6679;
+            color: #121212;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .view-btn {
+            background-color: #03dac6;
+            color: #121212;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+        
+        /* Back button styles */
+        .back-btn {
+            background-color: #555;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 0.95em;
+        }
+        .back-btn:hover {
+            background-color: #666;
+        }
+        
+        /* Editor styles */
+        .rich-text-editor {
+            margin-bottom: 15px;
+            border-radius: 4px;
+            background-color: #333;
+        }
+        .ql-container.ql-snow {
+            border-color: #444;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+            color: #e0e0e0;
+            min-height: 60px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .ql-toolbar.ql-snow {
+            background-color: #2a2a2a;
+            border-color: #444;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+            padding: 4px;
+        }
+        .ql-editor {
+            padding: 8px;
+            font-size: 0.95em;
+            min-height: 100px;
+        }
+        .ql-editor.ql-blank::before {
+            color: #999;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+        
+        /* Summary panel styles */
+        .summary-item {
+            background-color: #2d2d2d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .summary-item:hover {
+            background-color: #333;
+        }
+        .summary-item.completed {
+            opacity: 0.6;
+            background-color: #222;
+            text-decoration: line-through;
+        }
+        .summary-item.good {
+            background-color: rgba(0, 128, 0, 0.2);
+            border-left-color: #4caf50;
+        }
+        .summary-content {
+            color: #aaa;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            font-size: 0.9em;
+            line-height: 1.3;
+        }
+        .summary-status {
+            margin-top: 5px;
+            font-size: 0.8em;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.completed {
+            background-color: #888;
+        }
+        .status-dot.good {
+            background-color: #4caf50;
+        }
+        
+        /* Export/Import buttons */
+        .data-controls {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .data-btn {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .data-btn:hover {
+            background-color: #444;
+        }
+        
+        /* Modal for mobile menu */
+        .mobile-menu-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1001;
+            overflow-y: auto;
+        }
+        .mobile-menu-content {
+            background-color: #1e1e1e;
+            width: 80%;
+            max-width: 300px;
+            height: 100%;
+            padding: 20px;
+            position: relative;
+        }
+        .mobile-menu-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .mobile-menu-list {
+            margin-top: 40px;
+        }
+        .mobile-menu-list h2 {
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .mobile-menu-list li {
+            padding: 12px 0;
+            font-size: 1.1em;
+            border-bottom: 1px solid #333;
+        }
+        
+        /* Responsive Media Queries */
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 220px 1fr;
+            }
+            .subcategory-container {
+                flex-direction: row;
+            }
+            .subcategory-list {
+                width: 160px;
+                margin-right: 15px;
+                padding-right: 10px;
+                border-right: 1px solid #333;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: 180px 220px 1fr;
+            }
+            .mobile-nav, .mobile-panel-nav {
+                display: none !important;
+            }
+            .panel {
+                display: block !important;
+            }
+            body {
+                padding: 10px;
+            }
+            .container {
+                height: calc(100vh - 20px);
+            }
+            .sidebar, .summary-panel, .main-content {
+                height: auto;
+                max-height: calc(100vh - 20px);
+                overflow-y: auto;
+            }
+        }
+        
+        @media (max-width: 1023px) {
+            body {
+                padding-top: 60px;
+            }
+            .mobile-nav {
+                display: block;
+            }
+            .container {
+                height: auto;
+                min-height: calc(100vh - 70px);
+            }
+            .panel {
+                max-height: none;
+            }
+            .data-controls {
+                bottom: 70px;
+            }
+            .mobile-panel-nav {
+                display: block;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .text-boxes-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .text-boxes-header h3 {
+                margin-bottom: 10px;
+            }
+            .text-box-controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .checkbox-container {
+                margin-bottom: 8px;
+            }
+            .ql-toolbar.ql-snow {
+                flex-wrap: wrap;
+            }
+            .filter-options {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .filter-options label {
+                margin-bottom: 5px;
+            }
+            .filter-options select {
+                width: 100%;
+            }
+            .search-box {
+                flex-direction: column;
+            }
+            .search-box button {
+                width: 100%;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile Navigation Bar -->
+    <div class="mobile-nav">
+        <div class="mobile-nav-container">
+            <div class="mobile-title">Prompt Manager</div>
+            <button class="mobile-menu-btn" id="mobile-menu-toggle">☰</button>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Modal -->
+    <div class="mobile-menu-modal" id="mobile-menu-modal">
+        <div class="mobile-menu-content">
+            <button class="mobile-menu-close" id="mobile-menu-close">×</button>
+            <div class="mobile-menu-list">
+                <h2>Models</h2>
+                <ul id="mobile-categories">
+                    <!-- Models will be populated here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mobile Panel Navigation -->
+    <div class="mobile-panel-nav">
+        <div class="mobile-panel-buttons">
+            <button class="panel-btn active" id="panel-btn-models">Models</button>
+            <button class="panel-btn" id="panel-btn-summary">Summary</button>
+            <button class="panel-btn" id="panel-btn-content">Content</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar panel" id="models-panel">
+            <h2>Models</h2>
+            <ul id="categories">
+                <!-- Models will be populated here -->
+            </ul>
+        </div>
+        <div class="summary-panel panel" id="summary-panel">
+            <h2>All Entries</h2>
+            <div id="summary-list">
+                <!-- Summaries will be displayed here -->
+            </div>
+        </div>
+        <div class="main-content panel" id="content-panel">
+            <h1 id="selected-category">Select a model</h1>
+            
+            <!-- Hidden subcategory selection - not displayed but needed for JavaScript -->
+            <div id="subcategory-selection" style="display: none; position: absolute; visibility: hidden; height: 0; overflow: hidden;">
+                <ul id="subcategories"></ul>
+            </div>
+            
+            <div id="content-area">
+                <div class="content-placeholder">
+                    Select a model and behavior to begin
+                </div>
+            </div>
+            
+            <div class="content-area-grid" id="content-area-grid" style="display: none;">
+                <div class="search-container" id="search-container" style="display: none;">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Search entries...">
+                        <button id="search-btn">Search</button>
+                    </div>
+                    <div class="filter-options">
+                        <label for="subcategory-filter">Filter by behavior:</label>
+                        <select id="subcategory-filter">
+                            <option value="all">All Behaviors</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="subcategory-container">
+                    <div class="subcategory-list">
+                        <h3>Behaviors</h3>
+                        <ul id="subcategories-side">
+                            <!-- Behaviors will be populated here -->
+                        </ul>
+                    </div>
+                    
+                    <div class="text-boxes-container">
+                        <div class="text-boxes-header">
+                            <h3 id="content-title">Model > Behavior</h3>
+                            <button id="add-box-btn" class="add-btn">+ Add Text Box</button>
+                        </div>
+                        <div class="text-boxes-panel" id="text-boxes">
+                            <!-- Text boxes will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="data-controls">
+        <button id="export-btn" class="data-btn">Export Data</button>
+        <button id="import-btn" class="data-btn">Import Data</button>
+        <input type="file" id="import-file" style="display: none;" accept=".json">
+    </div>
+
+    <script>
+        // Sample data - easily replaceable
+        const data = {
+            categories: Array.from({ length: 20 }, (_, i) => `Model ${i+1}`),
+            subcategories: Array.from({ length: 9 }, (_, i) => `Behavior ${i+1}`),
+            entries: {}, // Will store user entries
+            version: '1.1' // Version for features
+        };
+
+        // Initialize local storage if needed
+        if (!localStorage.getItem('categoryAppData')) {
+            localStorage.setItem('categoryAppData', JSON.stringify(data));
+        } else {
+            // Check if we need to migrate from old Category names to new Model names
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            let needsUpdate = false;
+            
+            // Check if categories use "Category" instead of "Model"
+            if (storedData.categories && storedData.categories.length > 0 && storedData.categories[0].startsWith('Category')) {
+                // Update categories to use Model terminology
+                storedData.categories = storedData.categories.map(cat => cat.replace('Category', 'Model'));
+                needsUpdate = true;
+            }
+            
+            // Check if subcategories use "Subcategory" instead of "Behavior"
+            if (storedData.subcategories && storedData.subcategories.length > 0 && storedData.subcategories[0].startsWith('Subcategory')) {
+                // Update subcategories to use Behavior terminology
+                storedData.subcategories = storedData.subcategories.map(sub => sub.replace('Subcategory', 'Behavior'));
+                needsUpdate = true;
+            }
+            
+            // If we made changes, update localStorage
+            if (needsUpdate) {
+                // We need to migrate the entries as well
+                const newEntries = {};
+                
+                // For each old entry key, create a new one with updated model/behavior names
+                Object.keys(storedData.entries).forEach(key => {
+                    const parts = key.split('-');
+                    if (parts.length === 2) {
+                        const oldCategory = parts[0];
+                        const oldSubcategory = parts[1];
+                        const newCategory = oldCategory.replace('Category', 'Model');
+                        const newSubcategory = oldSubcategory.replace('Subcategory', 'Behavior');
+                        const newKey = `${newCategory}-${newSubcategory}`;
+                        
+                        // Copy the entries to the new key
+                        newEntries[newKey] = storedData.entries[key];
+                    } else {
+                        // Keep the original key if it doesn't match the expected format
+                        newEntries[key] = storedData.entries[key];
+                    }
+                });
+                
+                // Update the entries in the stored data
+                storedData.entries = newEntries;
+                
+                // Update version
+                storedData.version = '1.1';
+                
+                // Save updated data
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+        }
+
+        // DOM Elements
+        const categoriesList = document.getElementById('categories');
+        const mobileCategoriesList = document.getElementById('mobile-categories');
+        const subcategoriesList = document.getElementById('subcategories');
+        const selectedCategoryTitle = document.getElementById('selected-category');
+        const subcategorySelection = document.getElementById('subcategory-selection');
+        const contentArea = document.getElementById('content-area');
+        
+        // Mobile elements
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileMenuModal = document.getElementById('mobile-menu-modal');
+        const mobileMenuClose = document.getElementById('mobile-menu-close');
+        const panelBtnModels = document.getElementById('panel-btn-models');
+        const panelBtnSummary = document.getElementById('panel-btn-summary');
+        const panelBtnContent = document.getElementById('panel-btn-content');
+        const modelsPanel = document.getElementById('models-panel');
+        const summaryPanel = document.getElementById('summary-panel');
+        const contentPanel = document.getElementById('content-panel');
+        
+        // Mobile menu toggle
+        mobileMenuToggle.addEventListener('click', () => {
+            mobileMenuModal.style.display = 'block';
+        });
+        
+        mobileMenuClose.addEventListener('click', () => {
+            mobileMenuModal.style.display = 'none';
+        });
+        
+        // Mobile panel navigation
+        function showPanel(panelId) {
+            // Hide all panels
+            modelsPanel.classList.add('panel-hidden');
+            summaryPanel.classList.add('panel-hidden');
+            contentPanel.classList.add('panel-hidden');
+            
+            // Reset all button states
+            panelBtnModels.classList.remove('active');
+            panelBtnSummary.classList.remove('active');
+            panelBtnContent.classList.remove('active');
+            
+            // Show selected panel and activate button
+            if (panelId === 'models') {
+                modelsPanel.classList.remove('panel-hidden');
+                panelBtnModels.classList.add('active');
+            } else if (panelId === 'summary') {
+                summaryPanel.classList.remove('panel-hidden');
+                panelBtnSummary.classList.add('active');
+            } else if (panelId === 'content') {
+                contentPanel.classList.remove('panel-hidden');
+                panelBtnContent.classList.add('active');
+            }
+        }
+        
+        // Set up panel navigation events
+        panelBtnModels.addEventListener('click', () => showPanel('models'));
+        panelBtnSummary.addEventListener('click', () => showPanel('summary'));
+        panelBtnContent.addEventListener('click', () => showPanel('content'));
+        
+        // Check screen size and set up panels accordingly
+        function setupResponsiveLayout() {
+            if (window.innerWidth < 1024) {
+                // Mobile/tablet layout
+                modelsPanel.classList.add('panel-hidden');
+                summaryPanel.classList.add('panel-hidden');
+                contentPanel.classList.remove('panel-hidden');
+                
+                // Reset panel buttons
+                panelBtnModels.classList.remove('active');
+                panelBtnSummary.classList.remove('active');
+                panelBtnContent.classList.add('active');
+            } else {
+                // Desktop layout - show all panels
+                modelsPanel.classList.remove('panel-hidden');
+                summaryPanel.classList.remove('panel-hidden');
+                contentPanel.classList.remove('panel-hidden');
+            }
+        }
+        
+        // Populate categories with Model terminology
+        function populateCategories() {
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            categoriesList.innerHTML = '';
+            mobileCategoriesList.innerHTML = '';
+            
+            storedData.categories.forEach(category => {
+                // Populate main categories list
+                const li = document.createElement('li');
+                li.textContent = category.replace('Category', 'Model');
+                li.onclick = () => {
+                    selectCategory(category);
+                    // On mobile, close the menu and switch to content panel
+                    mobileMenuModal.style.display = 'none';
+                    if (window.innerWidth < 1024) {
+                        showPanel('content');
+                    }
+                };
+                categoriesList.appendChild(li);
+                
+                // Populate mobile categories list
+                const mobileLi = document.createElement('li');
+                mobileLi.textContent = category.replace('Category', 'Model');
+                mobileLi.onclick = () => {
+                    selectCategory(category);
+                    // Close the menu and switch to content panel
+                    mobileMenuModal.style.display = 'none';
+                    if (window.innerWidth < 1024) {
+                        showPanel('content');
+                    }
+                };
+                mobileCategoriesList.appendChild(mobileLi);
+            });
+        }
+
+        // Select a category
+        function selectCategory(category) {
+            // Clear previous selections
+            document.querySelectorAll('#categories li, #mobile-categories li').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Get display name with proper terminology
+            const displayCategory = category.replace('Category', 'Model');
+            
+            // Set active category
+            document.querySelectorAll('#categories li').forEach(item => {
+                if (item.textContent === displayCategory) {
+                    item.classList.add('active');
+                }
+            });
+            
+            document.querySelectorAll('#mobile-categories li').forEach(item => {
+                if (item.textContent === displayCategory) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // Update title with Model terminology
+            selectedCategoryTitle.textContent = displayCategory;
+            
+            // Show the search container
+            document.getElementById('search-container').style.display = 'block';
+            
+            // Show the content grid - important for categories with no entries
+            document.getElementById('content-area').style.display = 'none';
+            document.getElementById('content-area-grid').style.display = 'flex';
+            
+            // Populate subcategories only in the sidebar list (the main one is hidden)
+            populateSubcategories(category);
+            
+            // Update subcategory filter dropdown
+            updateSubcategoryFilter();
+            
+            // Setup search functionality
+            setupSearch(category);
+            
+            // Update summary panel to show only entries from this category
+            updateSummary(category);
+            
+            // Update summary title with Model terminology
+            document.querySelector('.summary-panel h2').innerHTML = `${displayCategory} Entries`;
+            
+            // Highlight related summary items
+            document.querySelectorAll('.summary-item').forEach(item => {
+                if (item.dataset.category === category) {
+                    item.style.borderLeft = '3px solid #bb86fc';
+                } else {
+                    item.style.borderLeft = '';
+                }
+            });
+            
+            // Update mobile title
+            document.querySelector('.mobile-title').textContent = displayCategory;
+        }
+        
+        // Update subcategory filter options
+        function updateSubcategoryFilter() {
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            const subcategoryFilter = document.getElementById('subcategory-filter');
+            
+            // Clear previous options except "All"
+            while (subcategoryFilter.options.length > 1) {
+                subcategoryFilter.remove(1);
+            }
+            
+            // Add subcategories as options
+            storedData.subcategories.forEach(subcategory => {
+                const option = document.createElement('option');
+                option.value = subcategory;
+                option.textContent = subcategory;
+                subcategoryFilter.appendChild(option);
+            });
+        }
+        
+        // Setup search functionality
+        function setupSearch(category) {
+            const searchInput = document.getElementById('search-input');
+            const searchBtn = document.getElementById('search-btn');
+            const subcategoryFilter = document.getElementById('subcategory-filter');
+            
+            // Reset search input
+            searchInput.value = '';
+            
+            // Set up event listeners
+            searchBtn.onclick = () => performSearch(category);
+            searchInput.onkeyup = (e) => {
+                if (e.key === 'Enter') {
+                    performSearch(category);
+                }
+            };
+            subcategoryFilter.onchange = () => performSearch(category);
+        }
+
+        // Now actually display subcategories on the side list, replacing Subcategory with Behavior
+        function populateSubcategories(category) {
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Populate the dropdown in the main area
+            subcategoriesList.innerHTML = '';
+            
+            storedData.subcategories.forEach(subcategory => {
+                const li = document.createElement('li');
+                // Use correct terminology in the displayed text
+                li.textContent = subcategory.replace('Subcategory', 'Behavior');
+                li.onclick = () => selectSubcategory(category, subcategory);
+                subcategoriesList.appendChild(li);
+            });
+            
+            // Also populate the sidebar subcategories list
+            const sideSubcategoriesList = document.getElementById('subcategories-side');
+            if (sideSubcategoriesList) {
+                sideSubcategoriesList.innerHTML = '';
+                
+                storedData.subcategories.forEach(subcategory => {
+                    const li = document.createElement('li');
+                    // Use correct terminology in the displayed text
+                    li.textContent = subcategory.replace('Subcategory', 'Behavior');
+                    li.onclick = () => selectSubcategory(category, subcategory);
+                    sideSubcategoriesList.appendChild(li);
+                });
+            }
+        }
+        
+        function displayContentArea(category, subcategory) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Create default entry if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [
+                    { text: '', completed: false, good: false, id: Date.now() }
+                ];
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+            
+            // Always hide the placeholder
+            document.getElementById('content-area').style.display = 'none';
+            const contentGrid = document.getElementById('content-area-grid');
+            contentGrid.style.display = 'flex';
+            
+            // Set the content title with Model/Behavior terminology
+            document.getElementById('content-title').textContent = `${category.replace('Category', 'Model')} > ${subcategory.replace('Subcategory', 'Behavior')}`;
+            
+            // Make search container visible
+            document.getElementById('search-container').style.display = 'block';
+            
+            // Render text boxes
+            renderTextBoxes(category, subcategory);
+            
+            // Add button event listener
+            document.getElementById('add-box-btn').addEventListener('click', () => {
+                addNewTextBox(category, subcategory);
+            });
+            
+            // Highlight the active subcategory in the side list
+            const subcategoriesList = document.getElementById('subcategories-side');
+            subcategoriesList.querySelectorAll('li').forEach(item => {
+                if (item.textContent === subcategory) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            // Update the main title to ensure consistency with Model terminology
+            document.getElementById('selected-category').textContent = category.replace('Category', 'Model');
+            
+            // Update mobile title
+            document.querySelector('.mobile-title').textContent = 
+                `${category.replace('Category', 'Model')} > ${subcategory.replace('Subcategory', 'Behavior')}`;
+        }
+        
+        // Select a subcategory
+        function selectSubcategory(category, subcategory) {
+            // Clear previous selections
+            document.querySelectorAll('#subcategories li').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Get the display names for model/behavior
+            const displayCategory = category.replace('Category', 'Model');
+            const displaySubcategory = subcategory.replace('Subcategory', 'Behavior');
+            
+            // Set active subcategory in the main list (hidden)
+            document.querySelectorAll('#subcategories li').forEach(item => {
+                if (item.textContent === displaySubcategory) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // Update title to ensure it shows "Model > Behavior"
+            document.getElementById('selected-category').textContent = displayCategory;
+            
+            // Show content area for selected model/behavior
+            displayContentArea(category, subcategory);
+            
+            // On mobile, switch to content panel
+            if (window.innerWidth < 1024) {
+                showPanel('content');
+            }
+        }
+        
+        // Render text boxes for selected category/subcategory
+        function renderTextBoxes(category, subcategory) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            const textBoxesContainer = document.getElementById('text-boxes');
+            textBoxesContainer.innerHTML = '';
+            
+            if (!storedData.entries[key] || storedData.entries[key].length === 0) {
+                // If no entries, create a default empty one
+                storedData.entries[key] = [
+                    { text: '', completed: false, good: false, id: Date.now() }
+                ];
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+            
+            storedData.entries[key].forEach(entry => {
+                const boxElement = document.createElement('div');
+                boxElement.className = `text-box ${entry.completed ? 'completed' : ''} ${entry.good ? 'good' : ''}`;
+                boxElement.dataset.id = entry.id;
+                
+                boxElement.innerHTML = `
+                    <div id="editor-${entry.id}" class="rich-text-editor"></div>
+                    <div class="text-box-controls">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="checkbox-${entry.id}" ${entry.completed ? 'checked' : ''}>
+                            <label for="checkbox-${entry.id}">Mark as completed</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="good-${entry.id}" ${entry.good ? 'checked' : ''}>
+                            <label for="good-${entry.id}">Mark as good</label>
+                        </div>
+                        <button class="delete-btn">Delete</button>
+                    </div>
+                `;
+                
+                textBoxesContainer.appendChild(boxElement);
+                
+                // Initialize Quill editor with more compact configuration
+                const quill = new Quill(`#editor-${entry.id}`, {
+                    theme: 'snow',
+                    placeholder: 'Enter your text here...',
+                    modules: {
+                        toolbar: [
+                            ['bold', 'italic', 'underline'], // Simplified toolbar
+                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                            ['clean']
+                        ]
+                    },
+                    bounds: `#editor-${entry.id}`
+                });
+                
+                // Set content
+                if (entry.text) {
+                    try {
+                        quill.setContents(JSON.parse(entry.text));
+                    } catch (e) {
+                        // If the stored content isn't valid Quill Delta format, set as text
+                        quill.setText(entry.text);
+                    }
+                }
+                
+                // Add event listeners for content changes
+                quill.on('text-change', function() {
+                    // Adjust height based on content
+                    let scrollHeight = quill.root.scrollHeight;
+                    if (scrollHeight > 60) { // Only if content exceeds minimum height
+                        // Set dynamic height with a maximum
+                        let newHeight = Math.min(scrollHeight, 300);
+                        quill.container.style.height = newHeight + 'px';
+                    }
+                    
+                    const content = JSON.stringify(quill.getContents());
+                    updateTextBox(category, subcategory, entry.id, content);
+                    updateSummary(category); // Update the summary panel
+                });
+                
+                const checkbox = boxElement.querySelector('input[type="checkbox"]#checkbox-' + entry.id);
+                checkbox.addEventListener('change', () => {
+                    toggleComplete(category, subcategory, entry.id, checkbox.checked);
+                    boxElement.classList.toggle('completed', checkbox.checked);
+                    updateSummary(category); // Update the summary panel
+                });
+                
+                const goodCheckbox = boxElement.querySelector('input[type="checkbox"]#good-' + entry.id);
+                goodCheckbox.addEventListener('change', () => {
+                    toggleGood(category, subcategory, entry.id, goodCheckbox.checked);
+                    boxElement.classList.toggle('good', goodCheckbox.checked);
+                    updateSummary(category); // Update the summary panel
+                });
+                
+                const deleteBtn = boxElement.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', () => {
+                    deleteTextBox(category, subcategory, entry.id);
+                    boxElement.remove();
+                    updateSummary(category); // Update the summary panel
+                });
+            });
+        }
+        
+        // Add a new text box
+        function addNewTextBox(category, subcategory) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Initialize entries array if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [];
+            }
+            
+            const newEntry = {
+                text: '',
+                completed: false,
+                good: false,
+                id: Date.now()
+            };
+            
+            storedData.entries[key].push(newEntry);
+            localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            
+            renderTextBoxes(category, subcategory);
+            updateSummary(category); // Update the summary panel
+        }
+        
+        // Update text box content
+        function updateTextBox(category, subcategory, id, text) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Initialize entries array if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [];
+            }
+            
+            const entryIndex = storedData.entries[key].findIndex(entry => entry.id == id);
+            if (entryIndex !== -1) {
+                storedData.entries[key][entryIndex].text = text;
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+        }
+        
+        // Toggle completion status
+        function toggleComplete(category, subcategory, id, completed) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Initialize entries array if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [];
+            }
+            
+            const entryIndex = storedData.entries[key].findIndex(entry => entry.id == id);
+            if (entryIndex !== -1) {
+                storedData.entries[key][entryIndex].completed = completed;
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+        }
+        
+        // Delete a text box
+        function deleteTextBox(category, subcategory, id) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Initialize entries array if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [];
+            }
+            
+            const entryIndex = storedData.entries[key].findIndex(entry => entry.id == id);
+            if (entryIndex !== -1) {
+                storedData.entries[key].splice(entryIndex, 1);
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+                
+                // If there are no entries left, create a default empty one
+                if (storedData.entries[key].length === 0) {
+                    storedData.entries[key] = [
+                        { text: '', completed: false, good: false, id: Date.now() }
+                    ];
+                    localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+                    renderTextBoxes(category, subcategory);
+                }
+            }
+        }
+        
+        // Toggle "good" status
+        function toggleGood(category, subcategory, id, good) {
+            const key = `${category}-${subcategory}`;
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            
+            // Initialize entries array if it doesn't exist
+            if (!storedData.entries[key]) {
+                storedData.entries[key] = [];
+            }
+            
+            const entryIndex = storedData.entries[key].findIndex(entry => entry.id == id);
+            if (entryIndex !== -1) {
+                storedData.entries[key][entryIndex].good = good;
+                localStorage.setItem('categoryAppData', JSON.stringify(storedData));
+            }
+        }
+        
+        // Perform search based on input and filters
+        function performSearch(category) {
+            const searchInput = document.getElementById('search-input');
+            const subcategoryFilter = document.getElementById('subcategory-filter');
+            const searchText = searchInput.value.toLowerCase();
+            const selectedSubcategory = subcategoryFilter.value;
+            
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            let results = [];
+            
+            // For each behavior
+            storedData.subcategories.forEach(subcategory => {
+                // Skip if filtering by behavior and it doesn't match
+                if (selectedSubcategory !== 'all' && selectedSubcategory !== subcategory) {
+                    return;
+                }
+                
+                const key = `${category}-${subcategory}`;
+                
+                // Skip if no entries for this model-behavior
+                if (!storedData.entries[key]) {
+                    return;
+                }
+                
+                // Search within text boxes
+                storedData.entries[key].forEach(entry => {
+                    let displayText = '';
+                    try {
+                        // Extract text from Quill Delta
+                        if (entry.text && typeof entry.text === 'string' && entry.text.startsWith('{')) {
+                            const contentObj = JSON.parse(entry.text);
+                            if (contentObj.ops) {
+                                displayText = contentObj.ops
+                                    .map(op => typeof op.insert === 'string' ? op.insert : '')
+                                    .join('');
+                            } else {
+                                displayText = entry.text;
+                            }
+                        } else {
+                            displayText = entry.text || '';
+                        }
+                    } catch (e) {
+                        displayText = entry.text || '';
+                    }
+                    
+                    if (searchText === '' || displayText.toLowerCase().includes(searchText)) {
+                        results.push({
+                            category,
+                            subcategory,
+                            entry,
+                            displayText
+                        });
+                    }
+                });
+            });
+            
+            // Display results
+            displaySearchResults(results);
+        }
+        
+        // Display search results
+        function displaySearchResults(results) {
+            // Hide the grid layout and show the basic content area
+            document.getElementById('content-area-grid').style.display = 'none';
+            const contentArea = document.getElementById('content-area');
+            contentArea.style.display = 'block';
+            
+            if (results.length === 0) {
+                contentArea.innerHTML = `
+                    <div class="search-results">
+                        <h3>Search Results</h3>
+                        <p>No matching entries found.</p>
+                        <button class="back-btn" onclick="goBack()">Back</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            let resultsHTML = `
+                <div class="search-results">
+                    <h3>Search Results (${results.length} found)</h3>
+            `;
+            
+            results.forEach(result => {
+                resultsHTML += `
+                    <div class="result-item ${result.entry.completed ? 'completed' : ''} ${result.entry.good ? 'good' : ''}">
+                        <div class="result-header">${result.category} > ${result.subcategory}</div>
+                        <div class="result-content">${result.displayText.substring(0, 150)}${result.displayText.length > 150 ? '...' : ''}</div>
+                        <div class="result-status">
+                            Status: ${result.entry.completed ? 'Completed' : 'Active'} ${result.entry.good ? '(Good)' : ''}
+                        </div>
+                        <button class="view-btn" onclick="selectSubcategory('${result.category}', '${result.subcategory}')">
+                            View & Edit
+                        </button>
+                    </div>
+                `;
+            });
+            
+            resultsHTML += `
+                <button class="back-btn" onclick="goBack()">Back</button>
+            </div>`;
+            
+            contentArea.innerHTML = resultsHTML;
+            
+            // After the HTML is set, replace all instances of 'Category' with 'Model' in the result headers
+            const resultHeaders = contentArea.querySelectorAll('.result-header');
+            resultHeaders.forEach(header => {
+                header.innerHTML = header.innerHTML.replace(/Category/g, 'Model').replace(/Subcategory/g, 'Behavior');
+            });
+        }
+        
+        // Function to safely go back 
+        window.goBack = function() {
+            const activeModel = document.querySelector('#categories li.active');
+            if (activeModel) {
+                selectCategory(activeModel.textContent);
+            } else {
+                // If no active model, just show the content area and hide search results
+                document.getElementById('content-area-grid').style.display = 'flex';
+                document.getElementById('content-area').style.display = 'none';
+            }
+        };
+        
+        // Function to update the summary panel - now correctly filtering by model
+        function updateSummary(filterModel = null) {
+            const storedData = JSON.parse(localStorage.getItem('categoryAppData'));
+            const summaryList = document.getElementById('summary-list');
+            
+            // Clear the current content
+            summaryList.innerHTML = '';
+            
+            // Collect all entries from all models and behaviors
+            let allEntries = [];
+            
+            storedData.categories.forEach(category => {
+                // Skip if we're filtering by model and this isn't the one
+                if (filterModel && category !== filterModel) {
+                    return;
+                }
+                
+                storedData.subcategories.forEach(subcategory => {
+                    const key = `${category}-${subcategory}`;
+                    
+                    if (storedData.entries[key]) {
+                        storedData.entries[key].forEach(entry => {
+                            // Skip empty entries
+                            if (!entry.text) return;
+                            
+                            let displayText = '';
+                            try {
+                                // Extract text from Quill Delta
+                                if (typeof entry.text === 'string' && entry.text.startsWith('{')) {
+                                    const contentObj = JSON.parse(entry.text);
+                                    if (contentObj.ops) {
+                                        displayText = contentObj.ops
+                                            .map(op => typeof op.insert === 'string' ? op.insert : '')
+                                            .join('');
+                                    } else {
+                                        displayText = entry.text;
+                                    }
+                                } else {
+                                    displayText = entry.text;
+                                }
+                            } catch (e) {
+                                // If parsing fails, use as is
+                                displayText = entry.text;
+                            }
+                            
+                            // Skip entries with no visible text
+                            if (!displayText.trim()) return;
+                            
+                            allEntries.push({
+                                id: entry.id,
+                                category,
+                                subcategory,
+                                text: displayText,
+                                completed: entry.completed,
+                                good: entry.good
+                            });
+                        });
+                    }
+                });
+            });
+            
+            // Sort entries: good first, then uncompleted, then completed
+            allEntries.sort((a, b) => {
+                if (a.good && !b.good) return -1;
+                if (!a.good && b.good) return 1;
+                if (a.completed && !b.completed) return 1;
+                if (!a.completed && b.completed) return -1;
+                return 0;
+            });
+            
+            // Display up to 50 entries (to avoid performance issues)
+            const maxEntries = Math.min(allEntries.length, 50);
+            
+            for (let i = 0; i < maxEntries; i++) {
+                const entry = allEntries[i];
+                const truncatedText = entry.text.length > 100 ? entry.text.substring(0, 100) + '...' : entry.text;
+                
+                const summaryItem = document.createElement('div');
+                summaryItem.className = `summary-item ${entry.completed ? 'completed' : ''} ${entry.good ? 'good' : ''}`;
+                summaryItem.dataset.category = entry.category;
+                summaryItem.dataset.subcategory = entry.subcategory;
+                
+                // Only show the text content, no category/subcategory title
+                summaryItem.innerHTML = `
+                    <div class="summary-content">${truncatedText}</div>
+                    <div class="summary-status">
+                        <span>
+                            ${entry.completed ? '<span class="status-dot completed" title="Completed"></span>' : ''}
+                            ${entry.good ? '<span class="status-dot good" title="Marked as good"></span>' : ''}
+                        </span>
+                    </div>
+                `;
+                
+                // Add click event to navigate to the entry
+                summaryItem.addEventListener('click', function() {
+                    selectCategory(entry.category);
+                    selectSubcategory(entry.category, entry.subcategory);
+                    
+                    // Highlight the corresponding text box briefly
+                    setTimeout(() => {
+                        const textBox = document.querySelector(`.text-box[data-id="${entry.id}"]`);
+                        if (textBox) {
+                            textBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            textBox.style.boxShadow = '0 0 0 2px #bb86fc';
+                            setTimeout(() => {
+                                textBox.style.boxShadow = '';
+                            }, 2000);
+                        }
+                    }, 300);
+                    
+                    // On mobile, switch to content panel
+                    if (window.innerWidth < 1024) {
+                        showPanel('content');
+                    }
+                });
+                
+                summaryList.appendChild(summaryItem);
+            }
+            
+            // If there are no entries yet
+            if (allEntries.length === 0) {
+                const modelName = filterModel ? filterModel.replace('Category', 'Model') : '';
+                summaryList.innerHTML = `<div class="empty-summary">No entries ${modelName ? 'for ' + modelName : ''}. Select a model and behavior to add content.</div>`;
+            }
+        }
+        
+        // Export data function
+        function exportData() {
+            const data = localStorage.getItem('categoryAppData');
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prompt-manager-backup.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Import data function
+        function importData() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        localStorage.setItem('categoryAppData', JSON.stringify(importedData));
+                        alert('Data imported successfully!');
+                        window.location.reload(); // Refresh to show imported data
+                    } catch (error) {
+                        alert('Error importing data: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+        
+        // Handle window resize to adjust layout
+        window.addEventListener('resize', function() {
+            setupResponsiveLayout();
+        });
+        
+        // Close mobile menu when clicking outside
+        window.addEventListener('click', function(e) {
+            if (mobileMenuModal.style.display === 'block' && !e.target.closest('.mobile-menu-content') && !e.target.closest('#mobile-menu-toggle')) {
+                mobileMenuModal.style.display = 'none';
+            }
+        });
+        
+        // Initialize the app
+        window.onload = function() {
+            // Setup responsive layout based on screen size
+            setupResponsiveLayout();
+            
+            populateCategories();
+            
+            // Initialize with all entries, but will be filtered when a model is selected
+            updateSummary();
+            
+            // Set up export/import buttons
+            document.getElementById('export-btn').addEventListener('click', exportData);
+            document.getElementById('import-btn').addEventListener('click', function() {
+                document.getElementById('import-file').click();
+            });
+            document.getElementById('import-file').addEventListener('change', importData);
+            
+            // Auto-select first model if available
+            const firstModel = data.categories[0];
+            if (firstModel) {
+                selectCategory(firstModel);
+            }
+        };
+    </script>
+</body>
+</html>
